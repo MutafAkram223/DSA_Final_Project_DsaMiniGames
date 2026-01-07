@@ -1,6 +1,3 @@
-// Base abstract class for all search game states
-// Contains properties common to all search algorithms
-
 public abstract class SearchGameState
 {
     public List<SearchBox> Boxes { get; set; }
@@ -11,13 +8,11 @@ public abstract class SearchGameState
     public string Algorithm { get; set; }
 }
 
-// State specific to Linear Search
 public class LinearSearchGameState : SearchGameState
 {
-    public int CurrentIndex { get; set; } // Ensures sequential access
+    public int CurrentIndex { get; set; } 
 }
 
-// State specific to Binary Search
 public class BinarySearchGameState : SearchGameState
 {
     public int Low { get; set; }

@@ -1,0 +1,17 @@
+{
+    "C_Cpp.copilotHover": "enabled",
+    "github.copilot.chat.agent.autoFix": true,
+    "github.copilot.chat.alternateGeminiModelFPrompt.enabled": true,
+    "github.copilot.chat.alternateGptPrompt.enabled": true,
+    "github.copilot.chat.anthropic.tools.websearch.enabled": true,
+    "github.copilot.chat.codesearch.enabled": true,
+    "github.copilot.chat.customAgents.showOrganizationAndEnterpriseAgents": true,
+    "github.copilot.chat.generateTests.codeLens": true,
+    "github.copilot.chat.githubMcpServer.enabled": true,
+    "github.copilot.chat.githubMcpServer.lockdown": true,
+    "chat.disableAIFeatures": false,
+    "github.copilot.chat.anthropic.tools.websearch.allowedDomains": [
+        ""
+    ],
+    "workbench.commandPalette.experimental.askChatLocation": "chatView"
+}

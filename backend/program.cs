@@ -1,19 +1,27 @@
+using Backend.Services;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services
+// Controllers
 builder.Services.AddControllers();
-builder.Services.AddCors();
+
+// QUEUE SERVICE (this fixes your error)
+builder.Services.AddScoped<QueueService>();
+
+// CORS
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
 
 var app = builder.Build();
 
-// Enable CORS (allow frontend)
-app.UseCors(options =>
-{
-    options.AllowAnyOrigin();
-    options.AllowAnyMethod();
-    options.AllowAnyHeader();
-});
-
+app.UseCors();
 app.MapControllers();
 
 app.Run("http://localhost:5000");

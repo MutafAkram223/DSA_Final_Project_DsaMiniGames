@@ -1,4 +1,3 @@
-// backend/DataStructures/Traversal.cs
 using System.Collections.Generic;
 
 public static class Traversal

@@ -1,250 +1,336 @@
-import React, { useState } from 'react';
-import '../styles/graph-game.css';
-
-// --- LEVEL CONFIGURATION ---
-const LEVELS = [
-  {
-    id: 1,
-    title: "Level 1: The Party",
-    instruction: "Connect ALL planets so everyone can come to the party!",
-    type: "undirected",
-    nodes: [
-      { id: 'A', label: '👾', x: 350, y: 50 },
-      { id: 'B', label: '🤖', x: 150, y: 250 },
-      { id: 'C', label: '👽', x: 550, y: 250 },
-      { id: 'D', label: '🐱', x: 350, y: 400 },
-    ],
-    edges: [], // User builds these
-    maxWeight: Infinity
-  },
-  {
-    id: 2,
-    title: "Level 2: One-Way Stream",
-    instruction: "The stream flows ONE WAY (A -> B -> C). Don't go against the arrows!",
-    type: "directed",
-    nodes: [
-      { id: 'A', label: '🚀', x: 100, y: 100 },
-      { id: 'B', label: '⛽', x: 400, y: 100 },
-      { id: 'C', label: '🏁', x: 400, y: 400 },
-      { id: 'D', label: '❌', x: 100, y: 400 }, // Trap node
-    ],
-    edges: [],
-    requiredPath: ['A', 'B', 'C']
-  },
-  {
-    id: 3,
-    title: "Level 3: Fuel Saver",
-    instruction: "Go from A to C using LESS than 10 Fuel. Watch the numbers on the lines!",
-    type: "weighted",
-    nodes: [
-      { id: 'A', label: '🚀', x: 100, y: 250 },
-      { id: 'B', label: '⛽', x: 400, y: 100 }, // Top path (Expensive)
-      { id: 'C', label: '🏁', x: 700, y: 250 },
-      { id: 'D', label: '🌑', x: 400, y: 400 }, // Bottom path (Cheap)
-    ],
-    // Pre-defined edges for weighted level, user selects path
-    predefinedEdges: [
-      { u: 'A', v: 'B', weight: 6 },
-      { u: 'B', v: 'C', weight: 6 }, // Path A-B-C cost 12 (Too high)
-      { u: 'A', v: 'D', weight: 3 },
-      { u: 'D', v: 'C', weight: 4 }, // Path A-D-C cost 7 (Win)
-    ]
-  }
-];
+import React, { useState, useEffect } from 'react';
 
 const GraphGame = () => {
-  const [levelIndex, setLevelIndex] = useState(null); // null = Menu
-  const [userEdges, setUserEdges] = useState([]);
-  const [selectedNode, setSelectedNode] = useState(null);
-  const [message, setMessage] = useState("");
-  const [gameState, setGameState] = useState("playing"); // playing, won, lost
+  const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [score, setScore] = useState(0);
+  const [showScore, setShowScore] = useState(false);
+  const [selectedAnswer, setSelectedAnswer] = useState(null);
+  const [isCorrect, setIsCorrect] = useState(null);
 
-  // --- ACTIONS ---
+  // --- AUTO-INJECT TAILWIND ---
+  useEffect(() => {
+    if (!document.querySelector('script[src="https://cdn.tailwindcss.com"]')) {
+      const script = document.createElement('script');
+      script.src = "https://cdn.tailwindcss.com";
+      document.head.appendChild(script);
+    }
+  }, []);
 
-  const startLevel = (index) => {
-    setLevelIndex(index);
-    setUserEdges([]);
-    setSelectedNode(null);
-    setGameState("playing");
-    setMessage(LEVELS[index].instruction);
-  };
+  // --- THE QUESTIONS DATA ---
+  const questions = [
+    {
+      type: 'theory',
+      questionText: "In Graph Theory, what do we call the lines connecting the points?",
+      options: [
+        { text: "Vertices", isCorrect: false },
+        { text: "Edges", isCorrect: true },
+        { text: "Nodes", isCorrect: false },
+        { text: "Pixels", isCorrect: false },
+      ],
+    },
+    {
+      type: 'theory',
+      questionText: "If you can travel in both directions between two nodes, the graph is:",
+      options: [
+        { text: "Directed", isCorrect: false },
+        { text: "Undirected", isCorrect: true },
+        { text: "Broken", isCorrect: false },
+        { text: "Weighted", isCorrect: false },
+      ],
+    },
+    {
+      type: 'theory',
+      questionText: "What is a 'Weighted Graph'?",
+      options: [
+        { text: "A graph with heavy nodes", isCorrect: false },
+        { text: "A graph drawn with thick lines", isCorrect: false },
+        { text: "Edges have assigned values (cost)", isCorrect: true },
+        { text: "A graph with only one node", isCorrect: false },
+      ],
+    },
+    {
+      type: 'visual',
+      visualType: 'undirected',
+      questionText: "Look at this beauty! What type of graph is this?",
+      options: [
+        { text: "Directed Graph", isCorrect: false },
+        { text: "Undirected Graph", isCorrect: true },
+        { text: "Null Graph", isCorrect: false },
+        { text: "Cyclic Graph", isCorrect: false },
+      ],
+    },
+    {
+      type: 'visual',
+      visualType: 'directed',
+      questionText: "Notice the arrows? What specific type is this?",
+      options: [
+        { text: "Undirected Graph", isCorrect: false },
+        { text: "Directed Graph (Digraph)", isCorrect: true },
+        { text: "Tree", isCorrect: false },
+        { text: "Complete Graph", isCorrect: false },
+      ],
+    },
+    {
+      type: 'visual',
+      visualType: 'cycle',
+      questionText: "You can start at A and return to A. This graph contains a:",
+      options: [
+        { text: "Cycle", isCorrect: true },
+        { text: "Dead End", isCorrect: false },
+        { text: "Bridge", isCorrect: false },
+        { text: "Leaf", isCorrect: false },
+      ],
+    },
+    {
+      type: 'visual',
+      visualType: 'disconnected',
+      questionText: "These two parts don't touch! This graph is:",
+      options: [
+        { text: "Connected", isCorrect: false },
+        { text: "Bipartite", isCorrect: false },
+        { text: "Disconnected", isCorrect: true },
+        { text: "Complete", isCorrect: false },
+      ],
+    },
+    {
+      type: 'visual',
+      visualType: 'star',
+      questionText: "One center node connected to everyone else. This looks like a:",
+      options: [
+        { text: "Line Graph", isCorrect: false },
+        { text: "Star Graph", isCorrect: true },
+        { text: "Ring Graph", isCorrect: false },
+        { text: "Mesh Graph", isCorrect: false },
+      ],
+    },
+  ];
 
-  const handleNodeClick = (nodeId) => {
-    if (gameState === "won") return;
-    const currentLevel = LEVELS[levelIndex];
+  const handleAnswerOptionClick = (isCorrect) => {
+    if (selectedAnswer !== null) return;
 
-    // LEVEL 3 LOGIC (Path Selection)
-    if (currentLevel.type === 'weighted') {
-      // In weighted level, clicking nodes selects the path "A -> D -> C"
-      if (selectedNode && selectedNode !== nodeId) {
-         // Find if there is a predefined edge
-         const edge = currentLevel.predefinedEdges.find(e => 
-           (e.u === selectedNode && e.v === nodeId) || (e.u === nodeId && e.v === selectedNode)
-         );
-         
-         if (edge) {
-            setUserEdges([...userEdges, { ...edge }]); // Add to path
-            setSelectedNode(nodeId); // Move player
-            checkWeightedWin([...userEdges, { ...edge }]);
-         } else {
-            setMessage("No road exists there!");
-         }
+    setSelectedAnswer(isCorrect ? 'correct' : 'wrong');
+    setIsCorrect(isCorrect);
+
+    if (isCorrect) {
+      setScore(score + 1);
+    }
+
+    setTimeout(() => {
+      const nextQuestion = currentQuestion + 1;
+      if (nextQuestion < questions.length) {
+        setCurrentQuestion(nextQuestion);
+        setSelectedAnswer(null);
+        setIsCorrect(null);
       } else {
-        setSelectedNode(nodeId);
+        setShowScore(true);
       }
-      return;
-    }
-
-    // LEVEL 1 & 2 LOGIC (Drawing Edges)
-    if (selectedNode === null) {
-      setSelectedNode(nodeId);
-    } else {
-      if (selectedNode !== nodeId) {
-        // Add Edge
-        const newEdge = { u: selectedNode, v: nodeId };
-        // Check if exists
-        const exists = userEdges.find(e => 
-          (e.u === selectedNode && e.v === nodeId) || 
-          (currentLevel.type === 'undirected' && e.u === nodeId && e.v === selectedNode)
-        );
-
-        if (!exists) {
-          const newEdges = [...userEdges, newEdge];
-          setUserEdges(newEdges);
-          
-          if (currentLevel.type === 'undirected') checkConnectivityWin(newEdges);
-          if (currentLevel.type === 'directed') checkDirectedWin(newEdges);
-        }
-        setSelectedNode(null);
-      }
-    }
+    }, 1500);
   };
 
-  // --- WIN CONDITIONS ---
-
-  const checkConnectivityWin = (edges) => {
-    // Simplified BFS to check if all 4 nodes are connected
-    // In a real app, use full Adjacency List BFS
-    if (edges.length >= 3) {
-       setGameState("won");
-       setMessage("🎉 SUCCESS! Everyone is invited!");
-    }
+  const restartGame = () => {
+    setCurrentQuestion(0);
+    setScore(0);
+    setShowScore(false);
+    setSelectedAnswer(null);
+    setIsCorrect(null);
   };
-
-  const checkDirectedWin = (edges) => {
-    // Check if path A -> B -> C exists
-    const hasAB = edges.find(e => e.u === 'A' && e.v === 'B');
-    const hasBC = edges.find(e => e.u === 'B' && e.v === 'C');
-    
-    // Check for bad paths
-    const hasBad = edges.find(e => e.u === 'B' && e.v === 'A'); // Going backwards
-
-    if (hasBad) {
-      setMessage("⚠️ Oops! You can't go against the flow!");
-      setUserEdges([]); // Reset
-    } else if (hasAB && hasBC) {
-      setGameState("won");
-      setMessage("🎉 SUCCESS! Pizza Delivered!");
-    }
-  };
-
-  const checkWeightedWin = (pathEdges) => {
-     // Calculate total cost
-     const totalCost = pathEdges.reduce((acc, edge) => acc + edge.weight, 0);
-     const currentLevel = LEVELS[levelIndex];
-     const lastNode = pathEdges[pathEdges.length-1].v;
-
-     if (lastNode === 'C') {
-        if (totalCost <= 10) {
-           setGameState("won");
-           setMessage(`🎉 SUCCESS! Total Fuel: ${totalCost} (Under 10)`);
-        } else {
-           setMessage(`❌ Too expensive! Cost: ${totalCost}. Resetting...`);
-           setTimeout(() => setUserEdges([]), 1500);
-           setSelectedNode(null);
-        }
-     }
-  };
-
-  // --- RENDER ---
-  
-  if (levelIndex === null) {
-    return (
-      <div className="game-container">
-        <h1>👾 Voidy's Galaxy</h1>
-        <p style={{color: '#e0aaff'}}>Learn Graphs to save the universe!</p>
-        <div className="level-grid">
-          {LEVELS.map((lvl, idx) => (
-            <div key={lvl.id} className="level-card" onClick={() => startLevel(idx)}>
-              <h2>{lvl.title}</h2>
-              <p style={{fontSize: '0.9rem', marginTop: '10px'}}>{lvl.type.toUpperCase()}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  const currentLevel = LEVELS[levelIndex];
-  const displayEdges = currentLevel.type === 'weighted' ? currentLevel.predefinedEdges : userEdges;
 
   return (
-    <div className="game-container">
-      <div className="top-bar">
-        <button className="back-btn" onClick={() => setLevelIndex(null)}>EXIT GALAXY</button>
-        <div className="instruction-box">{message}</div>
-      </div>
+    <>
+      <style>
+        {`
+          @keyframes bounce { 0% { transform: scale(0); } 100% { transform: scale(1); } }
+          @keyframes popIn { 
+            0% { transform: translate(-50%, -50%) scale(0); } 
+            80% { transform: translate(-50%, -50%) scale(1.2); } 
+            100% { transform: translate(-50%, -50%) scale(1) rotate(-5deg); } 
+          }
+          .animate-bounce-custom { animation: bounce 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+          .animate-popIn { animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        `}
+      </style>
 
-      <div className="game-area">
-        <svg>
-           <defs>
-            <marker id="arrow" markerWidth="10" markerHeight="10" refX="35" refY="3" orient="auto">
-              <path d="M0,0 L0,6 L9,3 z" fill="#9d4edd" />
-            </marker>
-          </defs>
-          {displayEdges.map((e, i) => {
-             const start = currentLevel.nodes.find(n => n.id === e.u);
-             const end = currentLevel.nodes.find(n => n.id === e.v);
-             
-             // Check if this edge is selected by user (for weighted level highlight)
-             const isSelected = userEdges.find(ue => ue.u === e.u && ue.v === e.v);
-             
-             return (
-               <g key={i}>
-                 <line 
-                   x1={start.x + 35} y1={start.y + 35} 
-                   x2={end.x + 35} y2={end.y + 35} 
-                   stroke={isSelected || currentLevel.type !== 'weighted' ? "#ff9e00" : "#4a148c"}
-                   strokeWidth={isSelected ? 6 : 4}
-                   markerEnd={currentLevel.type === 'directed' ? "url(#arrow)" : ""}
-                   strokeDasharray={currentLevel.type === 'weighted' && !isSelected ? "5,5" : "0"}
-                 />
-                 {currentLevel.type === 'weighted' && (
-                   <foreignObject 
-                      x={(start.x + end.x)/2 + 30} 
-                      y={(start.y + end.y)/2 + 30} 
-                      width="40" height="20"
-                   >
-                     <div className="weight-badge">{e.weight}</div>
-                   </foreignObject>
-                 )}
-               </g>
-             );
-          })}
-        </svg>
+      <div 
+        className="min-h-screen w-full flex justify-center items-center font-sans p-5"
+        style={{
+          backgroundColor: '#6c5ce7',
+          backgroundImage: `
+            radial-gradient(#a29bfe 20%, transparent 20%),
+            radial-gradient(#a29bfe 20%, transparent 20%)
+          `,
+          backgroundSize: '20px 20px',
+          backgroundPosition: '0 0, 10px 10px'
+        }}
+      >
+        <div className="bg-white w-full max-w-[500px] p-8 border-[3px] border-[#2d3436] rounded-[15px] shadow-[8px_8px_0_#2d3436] relative overflow-hidden">
+          <h1 className="text-center font-black text-3xl m-0 text-[#2d3436] drop-shadow-[2px_2px_0_#FFD93D] tracking-tight mb-6">
+            GRAPH MASTERY
+          </h1>
+          
+          {showScore ? (
+            <div className="text-center py-5">
+              <h2 className="text-2xl font-bold mb-4">GAME OVER!</h2>
+              <div className="w-[120px] h-[120px] mx-auto border-[3px] border-[#2d3436] rounded-full bg-[#FFD93D] flex justify-center items-center text-3xl font-black shadow-[4px_4px_0_#2d3436] animate-bounce-custom">
+                {score} / {questions.length}
+              </div>
+              <p className="mt-5 text-lg font-bold text-[#636e72]">
+                {score === 8 ? "PERFECT SCORE! YOU'RE A LEGEND!" : 
+                 score > 5 ? "Great Job! Almost a Pro." : "Keep Studying!"}
+              </p>
+              <button 
+                className="mt-6 bg-[#4D96FF] text-white border-[3px] border-[#2d3436] px-8 py-4 text-xl font-bold cursor-pointer shadow-[4px_4px_0_#2d3436] hover:bg-[#3b82f6] rounded-[10px]"
+                onClick={restartGame}
+              >
+                PLAY AGAIN
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Progress Bar */}
+              <div className="w-full h-[15px] border-[3px] border-[#2d3436] rounded-[10px] bg-[#eee] mb-5 overflow-hidden">
+                <div 
+                  className="h-full bg-[#6BCB77] transition-all duration-300 ease-out" 
+                  style={{ width: `${((currentQuestion + 1) / questions.length) * 100}%` }}
+                />
+              </div>
+              
+              <div className="text-center mb-6">
+                <div className="font-bold text-sm text-[#636e72] mb-2">
+                  <span>QUESTION {currentQuestion + 1}</span>/{questions.length}
+                </div>
+                
+                {/* Visual Container */}
+                {questions[currentQuestion].type === 'visual' && (
+                  <div className="my-5 p-2.5 bg-[#F7F7F7] border-[3px] border-[#2d3436] rounded-[10px] shadow-[4px_4px_0_rgba(0,0,0,0.1)] group hover:scale-[1.02] transition-transform">
+                    <GraphVisual type={questions[currentQuestion].visualType} />
+                  </div>
+                )}
 
-        {currentLevel.nodes.map(node => (
-          <div 
-            key={node.id}
-            className={`planet ${selectedNode === node.id ? 'selected' : ''}`}
-            style={{ left: node.x, top: node.y }}
-            onClick={() => handleNodeClick(node.id)}
-          >
-            {node.label}
-          </div>
-        ))}
+                <div className="text-xl font-bold leading-snug">
+                  {questions[currentQuestion].questionText}
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-4">
+                {questions[currentQuestion].options.map((option, index) => {
+                  let btnClass = "w-full text-left bg-white border-[3px] border-[#2d3436] rounded-[10px] p-4 text-base font-bold cursor-pointer transition-all shadow-[4px_4px_0_#2d3436] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[2px_2px_0_#2d3436] hover:bg-[#FFD93D]";
+                  
+                  if (selectedAnswer) {
+                    if (option.isCorrect) btnClass = "w-full text-left bg-[#6BCB77] text-[#2d3436] border-[3px] border-[#2d3436] rounded-[10px] p-4 text-base font-bold shadow-[4px_4px_0_#2d3436]";
+                    else if (selectedAnswer === 'wrong' && !option.isCorrect) btnClass = "w-full text-left bg-white border-[3px] border-[#2d3436] rounded-[10px] p-4 text-base font-bold shadow-[4px_4px_0_#2d3436] opacity-60 cursor-not-allowed";
+                    else btnClass += " opacity-60 cursor-not-allowed hover:bg-white"; // Disabled remaining options
+                  }
+
+                  return (
+                    <button 
+                      key={index} 
+                      className={btnClass} 
+                      onClick={() => handleAnswerOptionClick(option.isCorrect)}
+                      disabled={selectedAnswer !== null}
+                    >
+                      {option.text}
+                    </button>
+                  );
+                })}
+              </div>
+              
+              {selectedAnswer && (
+                 <div 
+                  className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 px-10 py-5 border-[3px] border-[#2d3436] text-3xl font-black z-10 shadow-[10px_10px_0_rgba(0,0,0,0.2)] animate-popIn whitespace-nowrap ${isCorrect ? 'bg-[#6BCB77] text-[#2d3436]' : 'bg-[#FF6B6B] text-white rotate-6'}`}
+                 >
+                   {isCorrect ? "NAILED IT!" : "OOPS!"}
+                 </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
-    </div>
+    </>
+  );
+};
+
+// --- SUB-COMPONENT FOR CARTOON GRAPHICS ---
+const GraphVisual = ({ type }) => {
+  const strokeColor = "#2d3436";
+  const strokeWidth = "3";
+  const nodeRadius = 15;
+
+  return (
+    <svg viewBox="0 0 300 150" className="w-full h-auto max-h-[200px]">
+      <defs>
+        <marker id="arrow" markerWidth="10" markerHeight="10" refX="22" refY="3" orient="auto" markerUnits="strokeWidth">
+          <path d="M0,0 L0,6 L9,3 z" fill={strokeColor} />
+        </marker>
+      </defs>
+
+      {type === 'undirected' && (
+        <g>
+           <line x1="50" y1="75" x2="150" y2="25" stroke={strokeColor} strokeWidth={strokeWidth} />
+           <line x1="50" y1="75" x2="150" y2="125" stroke={strokeColor} strokeWidth={strokeWidth} />
+           <line x1="150" y1="25" x2="250" y2="75" stroke={strokeColor} strokeWidth={strokeWidth} />
+           <circle cx="50" cy="75" r={nodeRadius} fill="#fab1a0" stroke={strokeColor} strokeWidth={strokeWidth} />
+           <circle cx="150" cy="25" r={nodeRadius} fill="#81ecec" stroke={strokeColor} strokeWidth={strokeWidth} />
+           <circle cx="150" cy="125" r={nodeRadius} fill="#74b9ff" stroke={strokeColor} strokeWidth={strokeWidth} />
+           <circle cx="250" cy="75" r={nodeRadius} fill="#a29bfe" stroke={strokeColor} strokeWidth={strokeWidth} />
+        </g>
+      )}
+
+      {type === 'directed' && (
+        <g>
+           <line x1="50" y1="75" x2="150" y2="75" stroke={strokeColor} strokeWidth={strokeWidth} markerEnd="url(#arrow)" />
+           <line x1="150" y1="75" x2="250" y2="40" stroke={strokeColor} strokeWidth={strokeWidth} markerEnd="url(#arrow)" />
+           <line x1="150" y1="75" x2="250" y2="110" stroke={strokeColor} strokeWidth={strokeWidth} markerEnd="url(#arrow)" />
+           <circle cx="50" cy="75" r={nodeRadius} fill="#ffeaa7" stroke={strokeColor} strokeWidth={strokeWidth} />
+           <circle cx="150" cy="75" r={nodeRadius} fill="#55efc4" stroke={strokeColor} strokeWidth={strokeWidth} />
+           <circle cx="250" cy="40" r={nodeRadius} fill="#ff7675" stroke={strokeColor} strokeWidth={strokeWidth} />
+           <circle cx="250" cy="110" r={nodeRadius} fill="#6c5ce7" stroke={strokeColor} strokeWidth={strokeWidth} />
+        </g>
+      )}
+
+      {type === 'cycle' && (
+        <g>
+           <polygon points="150,25 225,125 75,125" fill="none" stroke={strokeColor} strokeWidth={strokeWidth} />
+           <circle cx="150" cy="25" r={nodeRadius} fill="#fd79a8" stroke={strokeColor} strokeWidth={strokeWidth} />
+           <circle cx="225" cy="125" r={nodeRadius} fill="#fdcb6e" stroke={strokeColor} strokeWidth={strokeWidth} />
+           <circle cx="75" cy="125" r={nodeRadius} fill="#00b894" stroke={strokeColor} strokeWidth={strokeWidth} />
+        </g>
+      )}
+
+      {type === 'disconnected' && (
+        <g>
+           <line x1="50" y1="50" x2="100" y2="100" stroke={strokeColor} strokeWidth={strokeWidth} />
+           <circle cx="50" cy="50" r={nodeRadius} fill="#e17055" stroke={strokeColor} strokeWidth={strokeWidth} />
+           <circle cx="100" cy="100" r={nodeRadius} fill="#e17055" stroke={strokeColor} strokeWidth={strokeWidth} />
+           
+           <line x1="200" y1="50" x2="250" y2="50" stroke={strokeColor} strokeWidth={strokeWidth} />
+           <line x1="250" y1="50" x2="225" y2="100" stroke={strokeColor} strokeWidth={strokeWidth} />
+           <line x1="225" y1="100" x2="200" y2="50" stroke={strokeColor} strokeWidth={strokeWidth} />
+           <circle cx="200" cy="50" r={nodeRadius} fill="#0984e3" stroke={strokeColor} strokeWidth={strokeWidth} />
+           <circle cx="250" cy="50" r={nodeRadius} fill="#0984e3" stroke={strokeColor} strokeWidth={strokeWidth} />
+           <circle cx="225" cy="100" r={nodeRadius} fill="#0984e3" stroke={strokeColor} strokeWidth={strokeWidth} />
+           
+           <line x1="150" y1="10" x2="150" y2="140" stroke="#b2bec3" strokeWidth="2" strokeDasharray="5,5" />
+        </g>
+      )}
+
+      {type === 'star' && (
+        <g>
+           <line x1="150" y1="75" x2="150" y2="25" stroke={strokeColor} strokeWidth={strokeWidth} />
+           <line x1="150" y1="75" x2="200" y2="115" stroke={strokeColor} strokeWidth={strokeWidth} />
+           <line x1="150" y1="75" x2="100" y2="115" stroke={strokeColor} strokeWidth={strokeWidth} />
+           <line x1="150" y1="75" x2="90" y2="60" stroke={strokeColor} strokeWidth={strokeWidth} />
+           <line x1="150" y1="75" x2="210" y2="60" stroke={strokeColor} strokeWidth={strokeWidth} />
+
+           <circle cx="150" cy="25" r={10} fill="#fab1a0" stroke={strokeColor} strokeWidth={strokeWidth} />
+           <circle cx="200" cy="115" r={10} fill="#fab1a0" stroke={strokeColor} strokeWidth={strokeWidth} />
+           <circle cx="100" cy="115" r={10} fill="#fab1a0" stroke={strokeColor} strokeWidth={strokeWidth} />
+           <circle cx="90" cy="60" r={10} fill="#fab1a0" stroke={strokeColor} strokeWidth={strokeWidth} />
+           <circle cx="210" cy="60" r={10} fill="#fab1a0" stroke={strokeColor} strokeWidth={strokeWidth} />
+           
+           <circle cx="150" cy="75" r="20" fill="#fdcb6e" stroke={strokeColor} strokeWidth={strokeWidth} />
+        </g>
+      )}
+    </svg>
   );
 };
 

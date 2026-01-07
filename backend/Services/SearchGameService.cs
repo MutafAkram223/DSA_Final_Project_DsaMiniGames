@@ -1,6 +1,3 @@
-// This service controls the entire game logic
-// It uses real DSA algorithms and updates game state
-
 public class SearchGameService
 {
     private List<SearchBox> boxes;
@@ -18,23 +15,18 @@ public class SearchGameService
 
     public SearchGameService()
     {
-        // Initialize algorithm classes
         linearSearch = new LinearSearch();
         binarySearch = new BinarySearch();
     }
 
-    // Start a new level
     public SearchGameState StartLevel(int levelId)
     {
         moves = 0;
 
-        // Generate random boxes
         boxes = GenerateBoxes(15);
 
-        // Pick a random target from boxes
         target = boxes[new Random().Next(boxes.Count)].Value;
 
-        // Decide level type
         if (levelId == 1)
         {
             level = new SearchLevel
@@ -55,7 +47,6 @@ public class SearchGameService
                 MaxMoves = 4
             };
 
-            // Sort boxes for binary search
             boxes.Sort((a, b) => a.Value.CompareTo(b.Value));
 
             low = 0;
@@ -65,7 +56,6 @@ public class SearchGameService
         }
     }
 
-    // Handle user clicking a box
     public SearchGameState ClickBox(int index)
     {
         if (level.Type == "Linear")
@@ -78,10 +68,8 @@ public class SearchGameService
         }
     }
 
-    // One step of Linear Search
     private SearchGameState LinearStep(int index)
     {
-        // Enforce sequential access
         if (index != currentIndex)
         {
             return CreateLinearState();
@@ -89,18 +77,15 @@ public class SearchGameService
 
         moves++;
 
-        // If found
         if (boxes[index].Value == target)
         {
             boxes[index].Status = "found";
             return CreateLinearState(true, false);
         }
 
-        // Otherwise open the box
         boxes[index].Status = "open";
         currentIndex++;
 
-        // If end reached
         if (currentIndex >= boxes.Count)
         {
             return CreateLinearState(false, true);
@@ -109,12 +94,10 @@ public class SearchGameService
         return CreateLinearState();
     }
 
-    // One step of Binary Search
     private SearchGameState BinaryStep(int index)
     {
         int mid = (low + high) / 2;
 
-        // Only mid index is allowed
         if (index != mid)
         {
             return CreateBinaryState();
@@ -122,14 +105,12 @@ public class SearchGameService
 
         moves++;
 
-        // If found
         if (boxes[mid].Value == target)
         {
             boxes[mid].Status = "found";
             return CreateBinaryState(true, false);
         }
 
-        // Eliminate half based on comparison
         if (boxes[mid].Value < target)
         {
             for (int i = low; i <= mid; i++)
@@ -147,7 +128,6 @@ public class SearchGameService
             high = mid - 1;
         }
 
-        // If move limit exceeded
         if (moves >= level.MaxMoves)
         {
             return CreateBinaryState(false, true);
@@ -156,7 +136,6 @@ public class SearchGameService
         return CreateBinaryState();
     }
 
-    // Create Linear Search game state
     private LinearSearchGameState CreateLinearState(bool won = false, bool lost = false)
     {
         return new LinearSearchGameState
@@ -171,7 +150,6 @@ public class SearchGameService
         };
     }
 
-    // Create Binary Search game state
     private BinarySearchGameState CreateBinaryState(bool won = false, bool lost = false)
     {
         return new BinarySearchGameState
@@ -187,7 +165,6 @@ public class SearchGameService
         };
     }
 
-    // Generate unique random boxes
     private List<SearchBox> GenerateBoxes(int count)
     {
         HashSet<int> values = new HashSet<int>();

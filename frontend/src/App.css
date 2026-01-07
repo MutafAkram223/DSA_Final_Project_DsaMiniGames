@@ -40,3 +40,24 @@
 .read-the-docs {
   color: #888;
 }
+
+/* Default reset */
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Dashboard must scroll normally */
+.dashboard-root {
+  min-height: 100vh;
+  overflow: auto;
+}
+
+/* Games keep their full-screen behavior */
+.game-root {
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+}

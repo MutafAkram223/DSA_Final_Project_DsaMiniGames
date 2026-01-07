@@ -13,7 +13,6 @@ namespace DSAGamePlatform.DataStructures
             bool isCorrect = false;
             string message = "";
 
-            // DIRECT HASHING & CHAINING
             if (request.Mode == "DIRECT" || request.Mode == "CHAIN")
             {
                 expectedIndex = targetIndex;
@@ -39,7 +38,6 @@ namespace DSAGamePlatform.DataStructures
                 }
             }
 
-            // LINEAR PROBING & REHASHING
             else if (request.Mode == "LINEAR" || request.Mode == "REHASH")
             {
                 int probe = targetIndex;
