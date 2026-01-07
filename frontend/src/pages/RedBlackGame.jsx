@@ -3,16 +3,18 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Castle, Sword, Shield, RefreshCw, Zap, 
   Crown, Flag, AlertTriangle, CheckCircle2, 
-  Map, Target, TowerControl
+  Map, Target, TowerControl, ChevronRight, Activity, ScrollText, XCircle
 } from 'lucide-react';
+
+// Import logic from your local file
 import { RedBlackTree, COLORS } from '../services/RedBlackGame';
 
+// --- VISUAL CONSTANTS ---
 const RED = '#ff4757';
 const BLACK = '#2f3542';
 const GOLD = '#ffd93d';
 const BLUE = '#3742fa';
 const GREEN = '#2ed573';
-
 
 const MilitaryBtn = ({ onClick, color, icon: Icon, label, disabled, size = 'md', variant = 'standard' }) => (
   <motion.button
@@ -21,18 +23,17 @@ const MilitaryBtn = ({ onClick, color, icon: Icon, label, disabled, size = 'md',
     onClick={onClick}
     disabled={disabled}
     className={`
-      flex items-center justify-center gap-2 font-extrabold rounded-xl transition-all
-      ${disabled ? 'opacity-60 cursor-not-allowed bg-gray-600' : 'cursor-pointer'}
-      ${size === 'lg' ? 'px-8 py-4 text-xl' : 'px-6 py-3 text-base'}
+      flex items-center justify-center gap-2 font-extrabold rounded-xl transition-all shadow-md select-none
+      ${disabled ? 'opacity-50 cursor-not-allowed bg-gray-300 border-gray-300 text-gray-500' : 'cursor-pointer'}
+      ${size === 'lg' ? 'px-6 py-3 text-lg' : 'px-3 py-2 text-xs md:text-sm'}
     `}
     style={{
-      backgroundColor: disabled ? undefined : (variant === 'outline' ? 'transparent' : color),
-      border: `3px solid ${color}`,
-      color: variant === 'outline' ? color : 'white',
-      boxShadow: disabled ? 'none' : `0 6px 0 ${color}40, inset 0 1px 0 rgba(255,255,255,0.3)`
+      backgroundColor: disabled ? undefined : (variant === 'outline' ? 'white' : color),
+      border: `2px solid ${disabled ? 'transparent' : color}`,
+      color: disabled ? undefined : (variant === 'outline' ? color : 'white'),
     }}
   >
-    {Icon && <Icon size={size === 'lg' ? 26 : 20} strokeWidth={2.5} />}
+    {Icon && <Icon size={size === 'lg' ? 24 : 16} strokeWidth={2.5} />}
     <span>{label}</span>
   </motion.button>
 );
@@ -40,21 +41,22 @@ const MilitaryBtn = ({ onClick, color, icon: Icon, label, disabled, size = 'md',
 export default function CastleRealmDefender() {
   // --- STATE ---
   const [towers, setTowers] = useState([]);
-  const [gameState, setGameState] = useState('MENU'); // MENU, PLAYING, PUZZLE, VICTORY, SIEGE_LOST
+  const [edges, setEdges] = useState([]); // NEW: State for lines
+  const [gameState, setGameState] = useState('MENU'); 
   const [level, setLevel] = useState(0);
   const [score, setScore] = useState(0);
   const [integrity, setIntegrity] = useState(100);
   const [message, setMessage] = useState({ text: "Commander! The realm awaits your strategy.", type: 'neutral' });
+  const [logs, setLogs] = useState([]); 
   const [activeTower, setActiveTower] = useState(null);
   const [showTactics, setShowTactics] = useState(false);
   const [enemies, setEnemies] = useState([]);
   const [currentMission, setCurrentMission] = useState(null);
   
-  // Refs & Sets
+  // Refs
   const treeRef = useRef(new RedBlackTree());
   const [usedValues, setUsedValues] = useState(new Set());
 
-  // --- GAME LAWS ---
   const CASTLE_LAWS = [
     { title: "ROYAL LAW", desc: "The Central Keep must always be BLACK (Royal Guard).", color: BLACK, icon: Crown },
     { title: "MAGIC LAW", desc: "A RED Sorcerer Tower cannot neighbor another RED tower.", color: RED, icon: Zap },
@@ -62,9 +64,12 @@ export default function CastleRealmDefender() {
     { title: "CONSTRUCTION LAW", desc: "New towers start as RED (Sorcerer's Magic).", color: RED, icon: TowerControl }
   ];
 
-  // --- LOOPS & EFFECTS ---
+  // --- LOGGING SYSTEM ---
+  const addLog = (text, type = 'info') => {
+    setLogs(prev => [{ id: Date.now(), text, type }, ...prev].slice(0, 2));
+  };
 
-  // 1. Integrity Drain (Puzzle Mode)
+  // --- LOOPS ---
   useEffect(() => {
     let timer;
     if (gameState === 'PUZZLE') {
@@ -81,27 +86,30 @@ export default function CastleRealmDefender() {
     return () => clearInterval(timer);
   }, [gameState]);
 
-  // 2. Enemy Spawner
   useEffect(() => {
+    let enemyInterval;
     if (gameState === 'PLAYING' || gameState === 'PUZZLE') {
-      const enemyInterval = setInterval(() => {
+      enemyInterval = setInterval(() => {
         if (Math.random() > 0.7 && towers.length > 0) {
           const randomTower = towers[Math.floor(Math.random() * towers.length)];
           setEnemies(prev => [...prev, {
-            id: Date.now(),
+            id: Date.now() + Math.random(),
             targetX: randomTower.x,
             targetY: randomTower.y,
             progress: 0
           }]);
         }
       }, 3000);
-      return () => clearInterval(enemyInterval);
     }
+    return () => clearInterval(enemyInterval);
   }, [gameState, towers]);
 
-  // 3. Enemy Movement
   useEffect(() => {
     if (enemies.length === 0) return;
+    if (gameState === 'SIEGE_LOST' || gameState === 'MENU' || gameState === 'VICTORY' || gameState === 'LEVEL_COMPLETE') {
+      setEnemies([]);
+      return;
+    }
     const moveInterval = setInterval(() => {
       setEnemies(prev => prev.map(enemy => ({
         ...enemy,
@@ -109,28 +117,32 @@ export default function CastleRealmDefender() {
       })).filter(enemy => enemy.progress < 1));
     }, 100);
     return () => clearInterval(moveInterval);
-  }, [enemies]);
+  }, [enemies, gameState]);
 
-  // --- GAMEPLAY LOGIC ---
-
+  // --- LOGIC ---
   const generateRandomMission = (lvl) => {
-    if (lvl > 6) return null;
+    if (lvl > 7) return null;
     let val;
-    // Generate unique random value
     do {
       val = Math.floor(Math.random() * 90) + 10;
     } while (usedValues.has(val));
 
-    const missionNames = ["Iron Outpost", "Shadow Keep", "Dragon's Peak", "Frost Spire", "Ember Fort"];
-    const name = `${missionNames[Math.floor(Math.random() * missionNames.length)]} #${lvl}`;
-
-    return { name, val, task: `Construct Tower ${val}` };
+    const missionNames = ["Iron Outpost", "Shadow Keep", "Dragon's Peak", "Frost Spire", "Ember Fort", "Storm Citadel", "Void Nexus"];
+    return { name: `${missionNames[lvl-1] || 'Outpost'}`, val, task: `Construct Tower ${val}` };
   };
 
   const startCampaign = () => {
-    treeRef.current = new RedBlackTree();
+    if (treeRef.current && typeof treeRef.current.clear === 'function') {
+      treeRef.current.clear();
+    } else {
+      treeRef.current = new RedBlackTree();
+    }
+    
     setUsedValues(new Set());
     setTowers([]);
+    setEdges([]); // Clear edges
+    setEnemies([]);
+    setLogs([]);
     setLevel(1);
     setScore(0);
     setIntegrity(100);
@@ -138,72 +150,80 @@ export default function CastleRealmDefender() {
 
     const firstMission = generateRandomMission(1);
     setCurrentMission(firstMission);
-    buildTower(firstMission.val);
+    setTimeout(() => buildTower(firstMission.val), 500);
   };
 
   const buildTower = (val) => {
-    // 1. Insert into Logic Tree
+    setMessage({ text: `Constructing Tower ${val}...`, type: 'neutral' });
     const newNode = treeRef.current.insert(val);
     setUsedValues(prev => new Set(prev).add(val));
     updateVisuals();
 
-    // 2. Check for Red-Red Violation
-    if (newNode.parent && newNode.parent.color === COLORS.RED) {
-      setGameState('PUZZLE');
-      setActiveTower(newNode);
-      setMessage({ text: "⚠️ VIOLATION: Double Red! Magic interference detected!", type: 'danger' });
-    } else {
-      // Root must always be black logic (simplified for game start)
-      if (treeRef.current.root.color === COLORS.RED) {
-        treeRef.current.root.color = COLORS.BLACK;
+    setTimeout(() => {
+      if (newNode.parent && newNode.parent.color === COLORS.RED) {
+        setGameState('PUZZLE');
+        setActiveTower(newNode);
+        setMessage({ text: "⚠️ VIOLATION: Double Red detected!", type: 'danger' });
+        addLog(`Tower ${val} (RED) has Parent ${newNode.parent.val} (RED). Rule Violation!`, 'danger');
+      } else {
+        if (treeRef.current.root.color === COLORS.RED) {
+          treeRef.current.root.color = COLORS.BLACK;
+          addLog("Root node painted BLACK by Royal Law.", 'info');
+        } else if (newNode.parent) {
+          addLog(`Tower ${val} placed safely. Parent ${newNode.parent.val} is BLACK.`, 'success');
+        } else {
+          addLog("Root Tower established.", 'success');
+        }
+        updateVisuals();
+        setTimeout(() => completeLevel(), 1000);
       }
-      updateVisuals();
-      completeLevel();
-    }
+    }, 800);
   };
 
   const completeLevel = () => {
-    setMessage({ text: "Sector Stabilized! Honor increased.", type: 'success' });
     setScore(s => s + Math.floor(integrity));
-    setTimeout(() => {
+    if (level >= 6) {
+      setMessage({ text: "CAMPAIGN VICTORY! The Realm is Safe.", type: 'success' });
       setGameState('VICTORY');
-    }, 1000);
+    } else {
+      setMessage({ text: "Sector Secured. Awaiting Orders.", type: 'success' });
+      setGameState('LEVEL_COMPLETE');
+    }
   };
 
   const proceedToNextMission = () => {
-    if (level >= 6) {
-      setGameState('MENU');
-      return;
-    }
     const nextLvl = level + 1;
     setLevel(nextLvl);
     setIntegrity(100);
     setGameState('PLAYING');
 
     const nextMission = generateRandomMission(nextLvl);
-    setCurrentMission(nextMission);
-    buildTower(nextMission.val);
+    if(nextMission) {
+      setCurrentMission(nextMission);
+      buildTower(nextMission.val);
+    } else {
+      setGameState('VICTORY');
+    }
   };
 
   const updateVisuals = () => {
-    const data = treeRef.current.getVisualData();
-    setTowers([...data]);
+    const { nodes, edges } = treeRef.current.getVisualData();
+    setTowers([...nodes]);
+    setEdges([...edges]);
   };
 
-  // --- PUZZLE LOGIC (Red-Black Tree Fixes) ---
   const handleCommanderOrder = (order) => {
     if (gameState !== 'PUZZLE' || !activeTower) return;
-
     const tree = treeRef.current;
     let k = activeTower;
     let p = k.parent;
     let g = p ? p.parent : null;
-
-    if (!g) return; // Should not happen in puzzle mode usually
+    if (!g) return;
 
     let uncle = (g.left === p) ? g.right : g.left;
     let uncleIsRed = uncle && (uncle.color === COLORS.RED);
     let correctMove = false;
+    let explanation = "";
 
     if (order === 'RECOLOR_TOWERS') {
       if (uncleIsRed) {
@@ -211,17 +231,19 @@ export default function CastleRealmDefender() {
         p.color = COLORS.BLACK;
         uncle.color = COLORS.BLACK;
         g.color = COLORS.RED;
-        
+        explanation = `Uncle ${uncle.val} was RED. Recolor Strategy successful.`;
         if (g === tree.root) {
           g.color = COLORS.BLACK;
-          finishPuzzleStep();
+          explanation += " Root re-painted BLACK.";
+          finishPuzzleStep(explanation);
         } else if (g.parent && g.parent.color === COLORS.RED) {
           setActiveTower(g);
           updateVisuals();
           setMessage({ text: "Violation moved up! Stabilize the Grandparent!", type: 'danger' });
+          addLog(explanation + " Warning: Violation moved up!", 'warning');
           return;
         } else {
-          finishPuzzleStep();
+          finishPuzzleStep(explanation);
         }
       }
     } else if (order === 'REALIGN_WALLS') {
@@ -232,22 +254,26 @@ export default function CastleRealmDefender() {
             tree.rotateLeft(p);
             tree.rotateRight(g);
             k.color = COLORS.BLACK;
+            explanation = "Triangle formation detected. Double Rotation executed.";
           } else {
             tree.rotateRight(g);
             p.color = COLORS.BLACK;
+            explanation = "Line formation detected. Single Right Rotation executed.";
           }
         } else {
           if (k === p.left) {
             tree.rotateRight(p);
             tree.rotateLeft(g);
             k.color = COLORS.BLACK;
+            explanation = "Triangle formation detected. Double Rotation executed.";
           } else {
             tree.rotateLeft(p);
             p.color = COLORS.BLACK;
+            explanation = "Line formation detected. Single Left Rotation executed.";
           }
         }
         g.color = COLORS.RED;
-        finishPuzzleStep();
+        finishPuzzleStep(explanation);
       }
     }
 
@@ -255,16 +281,18 @@ export default function CastleRealmDefender() {
       updateVisuals();
     } else {
       setIntegrity(prev => Math.max(0, prev - 20));
-      setMessage({ text: "WRONG TACTIC! The walls are crumbling!", type: 'danger' });
+      setMessage({ text: "WRONG TACTIC! Analyze the Uncle's color!", type: 'danger' });
+      addLog("Failed Order. Check Castle Laws.", 'danger');
       shakeScreen();
     }
   };
 
-  const finishPuzzleStep = () => {
+  const finishPuzzleStep = (explanation = "Structure Stabilized.") => {
     setActiveTower(null);
     treeRef.current.root.color = COLORS.BLACK;
+    addLog(explanation, 'success');
     updateVisuals();
-    completeLevel();
+    setTimeout(() => completeLevel(), 1000);
   };
 
   const shakeScreen = () => {
@@ -278,7 +306,7 @@ export default function CastleRealmDefender() {
   return (
     <div id="game-container" className="w-screen h-screen overflow-hidden bg-gradient-to-br from-blue-900 to-indigo-950 flex flex-col font-sans select-none relative">
       
-      {/* INTERNAL STYLES FOR CUSTOM ANIMATIONS */}
+      {/* --- CSS & ANIMATIONS --- */}
       <style>{`
         @keyframes shake {
           0%, 100% { transform: translateX(0); }
@@ -289,6 +317,8 @@ export default function CastleRealmDefender() {
         .bg-grid-pattern {
           background-image: radial-gradient(circle at 50% 80%, rgba(74, 105, 189, 0.2), transparent 60%);
         }
+        .log-scroll::-webkit-scrollbar { width: 4px; }
+        .log-scroll::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); border-radius: 4px; }
       `}</style>
 
       {/* BACKGROUND */}
@@ -297,38 +327,27 @@ export default function CastleRealmDefender() {
         ⚔️ CASTLE REALM DEFENDER ⚔️
       </div>
 
-      {/* HEADER: WAR ROOM */}
-      <header className="relative z-20 w-full px-10 pt-8 pb-4 flex flex-col items-center gap-4">
-        {/* Badge */}
-        <div className="flex items-center gap-2 bg-gradient-to-br from-gray-800 to-black px-6 py-2 rounded-full border-2 border-yellow-400 shadow-xl text-gray-200 text-sm font-black">
-          <Crown size={20} color={GOLD} />
-          <span>COMMANDER</span>
-        </div>
-
-        {/* Resources Panel */}
-        <div className="w-full max-w-4xl bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl px-10 py-4 flex justify-between items-center shadow-lg">
-          
-          {/* Honor */}
-          <div className="flex items-center gap-4 text-white min-w-[120px]">
-            <Flag className="text-green-400 fill-current" />
+      {/* HEADER */}
+      <header className="relative z-20 w-full px-4 pt-8 pb-2 flex flex-col items-center gap-2">
+        <div className="w-full max-w-4xl bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl px-4 py-2 flex justify-between items-center shadow-lg">
+          <div className="flex items-center gap-2 text-white">
+            <div className="bg-black/30 p-1.5 rounded-lg"><Flag className="text-green-400 fill-current" size={16} /></div>
             <div>
-              <div className="text-[10px] uppercase opacity-70 font-bold tracking-wider">Honor</div>
-              <div className="text-2xl font-black text-yellow-300">{score}</div>
+              <div className="text-[10px] uppercase opacity-70 font-bold">Honor</div>
+              <div className="text-lg font-black text-yellow-300 leading-none">{score}</div>
             </div>
           </div>
-
-          {/* Battle Info */}
-          <div className="text-center text-white">
-            <div className="text-[10px] uppercase opacity-70 tracking-widest">Battle Status</div>
-            <div className="text-xl font-black drop-shadow-md">{currentMission?.name || "Awaiting Orders"}</div>
+          <div className="text-center text-white hidden md:block">
+            <div className="text-[10px] uppercase opacity-70 tracking-widest">Target</div>
+            <div className="text-base font-black drop-shadow-md leading-none">{currentMission?.name || "Standby"}</div>
           </div>
-
-          {/* Integrity */}
-          <div className="flex items-center gap-4 text-white min-w-[120px] justify-end">
-            <Shield className={`${integrity < 30 ? 'text-red-500' : 'text-green-500'} fill-current`} />
+          <div className="flex items-center gap-2 text-white justify-end">
+             <div className="bg-black/30 p-1.5 rounded-lg">
+               <Shield className={`${integrity < 30 ? 'text-red-500' : 'text-green-500'} fill-current`} size={16} />
+             </div>
             <div>
-              <div className="text-[10px] uppercase opacity-70 font-bold tracking-wider">Integrity</div>
-              <div className="text-2xl font-black text-yellow-300">{Math.floor(integrity)}%</div>
+              <div className="text-[10px] uppercase opacity-70 font-bold">Integrity</div>
+              <div className="text-lg font-black text-yellow-300 leading-none">{Math.floor(integrity)}%</div>
             </div>
           </div>
         </div>
@@ -345,27 +364,25 @@ export default function CastleRealmDefender() {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: -50, opacity: 0 }}
             className={`
-              absolute top-4 left-1/2 -translate-x-1/2 px-8 py-3 rounded-xl font-bold text-sm shadow-2xl
-              flex items-center gap-3 backdrop-blur-md border-2 z-50 whitespace-nowrap
+              absolute top-2 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full font-bold text-xs md:text-sm shadow-xl
+              flex items-center gap-2 backdrop-blur-md border-2 z-50 whitespace-nowrap
               ${message.type === 'danger' ? 'bg-red-500/20 border-red-500 text-red-100' : 
                 message.type === 'success' ? 'bg-green-500/20 border-green-500 text-green-100' : 
-                'bg-white/90 border-blue-500 text-gray-900'}
+                'bg-blue-900/40 border-blue-400 text-blue-100'}
             `}
           >
-            {message.type === 'danger' && <AlertTriangle size={18} />}
-            {message.type === 'success' && <CheckCircle2 size={18} />}
+            {message.type === 'danger' && <AlertTriangle size={16} />}
+            {message.type === 'success' && <CheckCircle2 size={16} />}
+            {message.type === 'neutral' && <Activity size={16} />}
             <span>{message.text}</span>
           </motion.div>
         </AnimatePresence>
 
-        {/* CASTLE GROUNDS (Tree Visualization) */}
         <div className="relative w-full h-full">
-          
-          {/* Enemies */}
           {enemies.map(enemy => (
             <motion.div
               key={enemy.id}
-              className="absolute text-2xl z-20 pointer-events-none drop-shadow-md"
+              className="absolute text-2xl z-20 pointer-events-none drop-shadow-md opacity-70"
               style={{
                 left: `calc(50% + ${enemy.targetX * enemy.progress}px)`,
                 top: `${enemy.targetY * enemy.progress}px`,
@@ -376,7 +393,25 @@ export default function CastleRealmDefender() {
             </motion.div>
           ))}
 
-          {/* Towers */}
+          {/* SVG LAYER FOR LINES (BEHIND TOWERS) */}
+          <svg className="absolute top-[80px] left-0 w-full h-full pointer-events-none z-10 overflow-visible">
+            {edges.map(edge => (
+              <motion.line
+                key={edge.id}
+                initial={{ pathLength: 0, opacity: 0 }}
+                animate={{ pathLength: 1, opacity: 1 }}
+                x1={`calc(50% + ${edge.x1}px)`}
+                y1={edge.y1 + 55} // Connect from bottom of parent (tower height ~60px)
+                x2={`calc(50% + ${edge.x2}px)`}
+                y2={edge.y2} // Connect to top of child
+                stroke="white"
+                strokeWidth="4"
+                strokeLinecap="round"
+                style={{ filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.5))" }}
+              />
+            ))}
+          </svg>
+
           <AnimatePresence>
             {towers.map((tower) => {
               const isRedTower = tower.color === RED || tower.color === COLORS.RED;
@@ -385,40 +420,38 @@ export default function CastleRealmDefender() {
               return (
                 <motion.div
                   key={tower.id}
-                  initial={{ scale: 0, y: -20 }}
+                  initial={{ scale: 0, opacity: 0, y: -50 }}
                   animate={{ 
                     scale: isViolator ? [1, 1.1, 1] : 1, 
-                    y: tower.y // Adjusted in CSS using 'bottom' usually, but here strictly controlling Y relative to container top
+                    opacity: 1,
+                    y: tower.y 
                   }}
                   transition={{ 
                     scale: isViolator ? { repeat: Infinity, duration: 0.8 } : { type: "spring", stiffness: 200 },
-                    y: { type: "spring", stiffness: 200 }
+                    y: { type: "spring", stiffness: 120, damping: 14 }
                   }}
                   className={`
-                    absolute w-[70px] h-[75px] rounded-t-2xl border-[3px] border-b-0
-                    flex flex-col justify-end items-center pb-2 z-30
-                    ${isViolator ? 'z-40 ring-4 ring-yellow-400 ring-offset-2 ring-offset-transparent' : ''}
+                    absolute w-[50px] h-[55px] md:w-[60px] md:h-[65px] rounded-t-xl border-[3px] border-b-0
+                    flex flex-col justify-end items-center pb-2 z-30 transition-colors duration-500
+                    ${isViolator ? 'z-40 ring-4 ring-yellow-400 shadow-[0_0_30px_rgba(255,215,0,0.6)]' : ''}
                   `}
                   style={{
-                    left: `calc(50% + ${tower.x}px - 35px)`, // Center anchor
-                    top: '100px', // Base offset
+                    left: `calc(50% + ${tower.x}px - 25px)`, // centered anchor
+                    top: '80px', // Adjusted to not hit header
                     background: isRedTower 
-                      ? 'linear-gradient(135deg, #ff6b6b 0%, #ff4757 100%)' 
-                      : 'linear-gradient(135deg, #2d3436 0%, #000000 100%)',
-                    borderColor: isRedTower ? '#c0392b' : '#000',
-                    boxShadow: `0 10px 0 ${isRedTower ? '#c0392b' : '#000'}, 0 0 20px ${isRedTower ? '#ff475755' : '#00000055'}`
+                      ? 'linear-gradient(180deg, #ff6b6b 0%, #c0392b 100%)' 
+                      : 'linear-gradient(180deg, #57606f 0%, #2f3542 100%)',
+                    borderColor: isRedTower ? '#a30000' : '#000',
+                    boxShadow: `0 8px 0 ${isRedTower ? '#7f0000' : '#000'}`
                   }}
                 >
-                  <div className="text-lg mb-0.5">{isRedTower ? '🔥' : '🛡️'}</div>
-                  <div className="text-white font-black text-sm drop-shadow-md">{tower.val}</div>
-                  <div className="text-[8px] text-white/80 tracking-widest mt-1">
-                    {isRedTower ? 'SORCERER' : 'KNIGHT'}
-                  </div>
-
+                  <div className="text-xs md:text-sm mb-0.5">{isRedTower ? '🔥' : '🛡️'}</div>
+                  <div className="text-white font-black text-[10px] md:text-xs drop-shadow-md">{tower.val}</div>
+                  
                   {isViolator && (
                     <motion.div 
-                      initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                      className="absolute -top-8 text-2xl"
+                      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: -25 }}
+                      className="absolute text-xl"
                     >
                       ⚠️
                     </motion.div>
@@ -429,118 +462,179 @@ export default function CastleRealmDefender() {
           </AnimatePresence>
         </div>
 
-        {/* MODALS */}
+        {/* --- MODALS --- */}
         <AnimatePresence>
-          
-          {/* TACTICS MANUAL */}
+          {gameState === 'MENU' && (
+            <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center backdrop-blur-sm px-4">
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+                className="bg-white/95 p-8 md:p-10 rounded-[40px] border-b-8 border-r-8 border-blue-900 text-center shadow-2xl max-w-md w-full flex flex-col items-center"
+              >
+                <div className="bg-yellow-400 p-4 rounded-full mb-6 shadow-lg">
+                   <Castle size={50} color="#000" />
+                </div>
+                <h1 className="text-3xl md:text-4xl font-black text-blue-900 mb-2 tracking-tight">RED-BLACK<br/>REALM</h1>
+                <p className="text-gray-500 mb-8 font-medium">Build the castle. Balance the magic.</p>
+                <div className="flex flex-col gap-3 w-full">
+                  <MilitaryBtn onClick={startCampaign} label="START CAMPAIGN" color={GREEN} icon={Sword} size="lg" />
+                  <MilitaryBtn onClick={() => setShowTactics(true)} label="TUTORIAL" color={BLUE} icon={Map} variant="outline" />
+                </div>
+              </motion.div>
+            </div>
+          )}
+
+          {gameState === 'LEVEL_COMPLETE' && (
+            <div className="absolute inset-0 z-40 flex items-end justify-center pb-20 pointer-events-none">
+              <motion.div 
+                initial={{ y: 100, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
+                className="pointer-events-auto bg-white p-6 rounded-2xl border-4 border-green-500 shadow-2xl flex flex-col items-center gap-4"
+              >
+                <div className="flex items-center gap-3 text-green-700">
+                  <CheckCircle2 size={32} />
+                  <span className="text-xl font-black uppercase">Sector Secured</span>
+                </div>
+                <p className="text-gray-500 text-sm">Structure stable. Ready for next tower.</p>
+                <MilitaryBtn onClick={proceedToNextMission} label="NEXT MISSION" color={GREEN} icon={ChevronRight} />
+              </motion.div>
+            </div>
+          )}
+
+          {gameState === 'VICTORY' && (
+            <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center backdrop-blur-md px-4">
+              <div className="bg-gradient-to-b from-yellow-100 to-white p-10 rounded-[3rem] border-8 border-yellow-400 text-center shadow-2xl max-w-lg w-full flex flex-col items-center relative overflow-hidden">
+                <div className="absolute inset-0 bg-yellow-400/10 z-0 opacity-50"></div>
+                <motion.div 
+                  animate={{ rotate: [0, 10, -10, 0] }} 
+                  transition={{ repeat: Infinity, duration: 2 }}
+                  className="relative z-10 mb-6"
+                >
+                  <Crown size={80} color={GOLD} strokeWidth={1.5} fill="#fff" />
+                </motion.div>
+                <h1 className="relative z-10 text-4xl font-black text-blue-900 mb-4 tracking-tighter">VICTORY!</h1>
+                <p className="relative z-10 text-gray-600 mb-8 text-lg">The Realm is perfectly balanced.</p>
+                <div className="relative z-10 flex gap-4">
+                  <div className="bg-blue-900 text-yellow-300 px-6 py-3 rounded-xl font-bold border-2 border-yellow-400">
+                    SCORE: {score}
+                  </div>
+                </div>
+                <div className="mt-8 relative z-10">
+                   <MilitaryBtn onClick={startCampaign} label="PLAY AGAIN" color={GREEN} icon={RefreshCw} size="lg" />
+                </div>
+              </div>
+            </div>
+          )}
+
+           {gameState === 'SIEGE_LOST' && (
+            <div className="fixed inset-0 bg-red-900/60 z-[200] flex items-center justify-center backdrop-blur-md px-4">
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+                className="bg-white p-8 rounded-3xl border-4 border-red-500 shadow-2xl text-center max-w-sm"
+              >
+                <AlertTriangle size={60} className="text-red-500 mx-auto mb-4" />
+                <h2 className="text-3xl font-black text-gray-900 mb-2">SIEGE LOST</h2>
+                <p className="text-gray-500 mb-6">The magic became unstable.</p>
+                <MilitaryBtn onClick={startCampaign} label="RETRY" color={RED} icon={RefreshCw} />
+              </motion.div>
+            </div>
+          )}
+
+          {/* --- TACTICS MANUAL (TUTORIAL) --- */}
           {showTactics && (
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/70 flex items-center justify-center z-[100]"
+              className="fixed inset-0 bg-black/80 flex items-center justify-center z-[1000] backdrop-blur-sm px-4"
             >
-              <motion.div 
-                initial={{ scale: 0.9 }} animate={{ scale: 1 }}
-                className="bg-gray-100 w-[90%] max-w-2xl p-8 rounded-3xl border-4 border-yellow-400 shadow-2xl flex flex-col gap-6"
-              >
-                <div className="flex justify-between items-center border-b-2 border-blue-500/20 pb-4">
-                  <h2 className="text-2xl font-black text-gray-900">WAR COUNCIL</h2>
-                  <button onClick={() => setShowTactics(false)} className="text-2xl text-gray-500 hover:text-red-500">✕</button>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {CASTLE_LAWS.map((law, i) => (
-                    <div key={i} className="bg-white p-4 rounded-xl border shadow-sm">
-                      <h3 className="font-bold mb-2 flex items-center gap-2" style={{ color: law.color }}>
-                        <law.icon size={16} /> {law.title}
-                      </h3>
-                      <p className="text-gray-800 text-sm leading-relaxed">{law.desc}</p>
-                    </div>
-                  ))}
-                </div>
-                <div className="self-center">
-                  <MilitaryBtn onClick={() => setShowTactics(false)} label="RETURN" color={BLUE} icon={Sword} />
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-
-          {/* MAIN MENU */}
-          {gameState === 'MENU' && (
-            <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center backdrop-blur-sm">
-              <div className="bg-white/95 p-12 rounded-[40px] border-[6px] border-yellow-400 text-center shadow-2xl max-w-md w-full flex flex-col items-center">
-                <Castle size={80} color={GOLD} className="mb-4 drop-shadow-lg" />
-                <h1 className="text-4xl font-black text-blue-900 mb-8 leading-tight">CASTLE REALM<br/>DEFENDER</h1>
-                <div className="flex gap-4">
-                  <MilitaryBtn onClick={() => setShowTactics(true)} label="MANUAL" color={BLUE} icon={Map} variant="outline" />
-                  <MilitaryBtn onClick={startCampaign} label="CAMPAIGN" color={GREEN} icon={Sword} />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* GAME OVER */}
-          {gameState === 'SIEGE_LOST' && (
-            <div className="fixed inset-0 bg-red-900/40 z-[200] flex items-center justify-center backdrop-blur-md">
-              <motion.div 
-                initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-                className="bg-white max-w-md w-full rounded-2xl overflow-hidden border-2 border-red-500 shadow-2xl"
-              >
-                <div className="bg-red-50 p-8 text-center flex flex-col items-center gap-2 border-b border-red-100">
-                  <AlertTriangle size={50} color={RED} />
-                  <h1 className="text-3xl font-black text-red-500">SIEGE LOST</h1>
-                </div>
-                <div className="p-8 text-center text-gray-600">
-                  <p className="mb-6">The castle walls have crumbled under the arcane pressure. Your strategy was not completed in time.</p>
-                  <div className="flex justify-center">
-                    <MilitaryBtn onClick={startCampaign} label="RETRY" color={RED} icon={RefreshCw} />
-                  </div>
-                </div>
-              </motion.div>
-            </div>
-          )}
-
-          {/* VICTORY */}
-          {gameState === 'VICTORY' && (
-            <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center">
-              <div className="bg-gradient-to-br from-white to-yellow-50 p-10 rounded-[40px] border-[6px] border-yellow-400 text-center max-w-lg w-full flex flex-col items-center shadow-2xl">
-                <Crown size={80} color={GOLD} className="mb-6 drop-shadow-md" />
-                <h1 className="text-4xl font-black text-blue-900 mb-2">VICTORY!</h1>
-                <p className="text-lg text-gray-500 mb-8 font-medium">{currentMission?.name} is secure.</p>
+              <div className="bg-gray-100 w-full max-w-2xl rounded-3xl border-4 border-blue-500 shadow-2xl flex flex-col overflow-hidden max-h-[85vh]">
                 
-                <div className="flex gap-4 mb-8">
-                  <div className="bg-blue-900 text-yellow-300 px-6 py-3 rounded-xl font-bold">
-                    HONOR: {score}
+                {/* Modal Header */}
+                <div className="bg-white p-4 border-b border-gray-300 flex justify-between items-center shrink-0">
+                  <h2 className="text-xl md:text-2xl font-black text-gray-900 flex items-center gap-2">
+                    <Map size={24} className="text-blue-600" />
+                    ROYAL ARCHITECT MANUAL
+                  </h2>
+                  <button 
+                    onClick={() => setShowTactics(false)} 
+                    className="p-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-full transition-colors"
+                  >
+                    <XCircle size={28} />
+                  </button>
+                </div>
+
+                {/* Modal Content */}
+                <div className="p-6 overflow-y-auto">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                    {CASTLE_LAWS.map((law, i) => (
+                      <div key={i} className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm flex flex-col gap-2">
+                        <div className="flex items-center gap-2 font-bold" style={{ color: law.color }}>
+                          <law.icon size={20} /> {law.title}
+                        </div>
+                        <p className="text-gray-600 text-sm leading-relaxed">{law.desc}</p>
+                      </div>
+                    ))}
                   </div>
-                  <div className="bg-blue-900 text-yellow-300 px-6 py-3 rounded-xl font-bold">
-                    LEVEL: {level}/6
+
+                  <div className="bg-blue-100 p-5 rounded-xl text-blue-900 text-sm">
+                    <h3 className="font-bold text-lg mb-2 flex items-center gap-2">
+                      <Target size={18} /> How to Fix Violations
+                    </h3>
+                    <p className="mb-2">When a red tower sits on another red tower:</p>
+                    <ul className="space-y-2">
+                      <li className="flex items-start gap-2 bg-white/50 p-2 rounded-lg">
+                        <span className="font-bold text-blue-600">1. Look at the Uncle:</span> 
+                        The sibling of the parent tower.
+                      </li>
+                      <li className="flex items-start gap-2 bg-white/50 p-2 rounded-lg">
+                        <span className="font-bold text-red-500">Uncle is RED?</span> 
+                        Use the <strong className="text-orange-600">RECOLOR</strong> button.
+                      </li>
+                      <li className="flex items-start gap-2 bg-white/50 p-2 rounded-lg">
+                        <span className="font-bold text-gray-800">Uncle is BLACK (or missing)?</span> 
+                        Use the <strong className="text-purple-600">REALIGN</strong> button to rotate.
+                      </li>
+                    </ul>
                   </div>
                 </div>
 
-                <MilitaryBtn 
-                  onClick={proceedToNextMission} 
-                  label={level >= 6 ? "CLAIM FINAL VICTORY" : `MARCH TO LEVEL ${level + 1}`} 
-                  color={GREEN} 
-                  icon={level >= 6 ? Crown : Sword} 
-                  size="lg" 
-                />
+                {/* Modal Footer */}
+                <div className="p-4 bg-gray-50 border-t border-gray-200 flex justify-center shrink-0">
+                   <MilitaryBtn onClick={() => setShowTactics(false)} label="CLOSE MANUAL" color={BLUE} icon={CheckCircle2} />
+                </div>
               </div>
-            </div>
+            </motion.div>
           )}
         </AnimatePresence>
       </main>
 
-      {/* FOOTER CONTROLS */}
-      <footer className="h-[140px] bg-white w-full border-t-4 border-gray-800 flex flex-col items-center justify-center relative z-40">
-        <div className="absolute -top-8 bg-gray-800 text-gray-400 px-4 py-1 rounded-t-lg text-[10px] font-black tracking-widest uppercase">
-          Commander's Orders
+      {/* FOOTER CONTROLS & LOGS: REDUCED HEIGHT to 100px */}
+      <footer className="h-[100px] w-full bg-slate-50 border-t-2 border-slate-200 flex flex-col relative z-40 shadow-xl">
+        {/* LOG PANEL: SMALLER */}
+        <div className="flex-1 px-4 py-1 overflow-y-auto log-scroll flex flex-col gap-0.5 bg-white/50">
+           {logs.length === 0 && (
+             <div className="text-slate-400 text-[10px] italic flex items-center gap-2 mt-1">
+               <ScrollText size={12} /> Systems online.
+             </div>
+           )}
+           {logs.map((log) => (
+             <div key={log.id} className={`text-[10px] font-semibold flex items-start gap-2 ${
+               log.type === 'danger' ? 'text-red-600' : 
+               log.type === 'success' ? 'text-green-600' : 
+               log.type === 'warning' ? 'text-amber-600' : 'text-blue-600'
+             }`}>
+               <span className="mt-0.5 opacity-50 text-[8px]">➤</span>
+               {log.text}
+             </div>
+           ))}
         </div>
-        
-        <div className="flex gap-6 mb-3">
+
+        {/* BUTTONS: COMPACT BAR */}
+        <div className="h-[50px] flex items-center justify-center gap-4 bg-white border-t border-slate-200">
           <MilitaryBtn 
             label="RECOLOR" 
             color="#e67e22" 
             icon={RefreshCw}
             disabled={gameState !== 'PUZZLE'}
             onClick={() => handleCommanderOrder('RECOLOR_TOWERS')}
+            size="sm"
           />
           <MilitaryBtn 
             label="REALIGN" 
@@ -548,14 +642,8 @@ export default function CastleRealmDefender() {
             icon={Target}
             disabled={gameState !== 'PUZZLE'}
             onClick={() => handleCommanderOrder('REALIGN_WALLS')}
+            size="sm"
           />
-        </div>
-
-        <div className="text-xs text-gray-500 italic font-medium">
-          {gameState === 'PUZZLE' 
-            ? "⚠️ DEFENSE BREACH! Issue orders to secure the castle!" 
-            : "Awaiting strategic positioning..."
-          }
         </div>
       </footer>
     </div>

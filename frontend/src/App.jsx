@@ -11,6 +11,8 @@ import TreeGame from './pages/Treegame';
 import GraphGame from './pages/GraphGame';
 import DijkstraGame from './pages/Dijkstra';
 
+import CastleRealmDefender from './pages/RedBlackGame';
+
 export default function App() {
   
   useEffect(() => {
@@ -36,6 +38,8 @@ export default function App() {
         <Route path="/tree" element={<TreeGame />} />
         <Route path="/graph" element={<GraphGame />} />
         <Route path="/dijkstra" element={<DijkstraGame />} />
+
+        <Route path="/red-black-tree" element={<CastleRealmDefender />} />
         
         {/* Fallback for unknown routes */}
         <Route path="*" element={<Dashboard />} />

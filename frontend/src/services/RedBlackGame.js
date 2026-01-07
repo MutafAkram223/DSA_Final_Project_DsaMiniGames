@@ -21,6 +21,10 @@ export class RedBlackTree {
     this.root = null;
   }
 
+  clear() {
+    this.root = null;
+  }
+
   insert(val) {
     if (!this.root) {
       this.root = new Node(val, COLORS.BLACK);
@@ -93,17 +97,24 @@ export class RedBlackTree {
     node.parent = leftChild;
   }
 
-  // Visual traversal to assign X/Y coordinates for the UI
+  // --- UPDATED: Returns both Nodes and Edges ---
   getVisualData() {
     const nodes = [];
-    if (!this.root) return nodes;
+    const edges = [];
+    
+    if (!this.root) return { nodes, edges };
 
-    const traverse = (node, depth, offset, xPos) => {
+    const INITIAL_WIDTH = 300; 
+    
+    // Helper to traverse and collect data
+    const traverse = (node, depth, xPos, availableWidth) => {
       if (!node) return;
 
+      // Calculate position
       node.y = depth * 80; 
       node.x = xPos;
 
+      // Add Node
       nodes.push({
         id: node.id,
         val: node.val,
@@ -113,13 +124,43 @@ export class RedBlackTree {
         type: node.color === COLORS.RED ? 'SORCERER' : 'KNIGHT'
       });
 
-      const gap = 200 / (depth + 1); 
+      // Calculate child width for next level
+      const nextWidth = availableWidth / 2;
 
-      traverse(node.left, depth + 1, gap, xPos - gap);
-      traverse(node.right, depth + 1, gap, xPos + gap);
+      // Process Left Child
+      if (node.left) {
+        const childX = xPos - availableWidth;
+        const childY = (depth + 1) * 80;
+        
+        edges.push({
+          id: `${node.id}-left`,
+          x1: xPos,
+          y1: node.y,
+          x2: childX,
+          y2: childY
+        });
+        
+        traverse(node.left, depth + 1, childX, nextWidth);
+      }
+
+      // Process Right Child
+      if (node.right) {
+        const childX = xPos + availableWidth;
+        const childY = (depth + 1) * 80;
+
+        edges.push({
+          id: `${node.id}-right`,
+          x1: xPos,
+          y1: node.y,
+          x2: childX,
+          y2: childY
+        });
+
+        traverse(node.right, depth + 1, childX, nextWidth);
+      }
     };
 
-    traverse(this.root, 0, 0, 0);
-    return nodes;
+    traverse(this.root, 0, 0, INITIAL_WIDTH);
+    return { nodes, edges };
   }
 }

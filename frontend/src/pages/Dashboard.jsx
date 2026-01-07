@@ -9,6 +9,7 @@ const games = [
   { name: "Tree Game", path: "/tree", icon: "🌳", color: "bg-emerald-100" },
   { name: "Graph Game", path: "/graph", icon: "🕸️", color: "bg-red-100" },
   { name: "Dijkstra Game", path: "/dijkstra", icon: "🚗", color: "bg-orange-100" },
+  { name: "RB Tree Realm", path: "/red-black-tree", icon: "⚔️", color: "bg-rose-200" },
 ];
 
 export default function Dashboard() {
